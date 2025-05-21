@@ -11,7 +11,7 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('css/style.css') }}">
-    <title>{{ $title ?? 'Workopia | FInd and list jobs' }}</title>
+    <title>Workopia | {{ $pageTitle ?? 'Find and list jobs' }}</title>
 </head>
 
 <body class="bg-gray-100">

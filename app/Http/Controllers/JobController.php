@@ -7,18 +7,22 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class JobController extends Controller
-{
+{   
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      * @desc Show all job listings
      * @route GET /jobs
      */
     public function index(): View
-    {
-        $jobs = Job::all();
-
+    {   
+        
+        $jobs = Job::paginate(6);
+        
         return view('jobs.index')->with('jobs', $jobs);
     }
 
@@ -28,7 +32,7 @@ class JobController extends Controller
      * @route GET /jobs/create
      */
     public function create(): View
-    {
+    {   
         return view('jobs.create');
     }
 
@@ -63,7 +67,7 @@ class JobController extends Controller
             'company_website' => 'nullable|url',
         ]);
         //hardcode user ID
-        $validatedData['user_id'] = 1;
+        $validatedData['user_id'] = Auth::id();
 
         //check for image
         if($request->hasFile('company_logo')) {
@@ -96,7 +100,10 @@ class JobController extends Controller
      * @route GET /jobs/{$id}/edit
      */
     public function edit(Job $job): View    
-    {
+    {   
+        // Check if the user is authorized
+        $this->authorize('update', $job);
+        
         return view('jobs.edit')->with('job', $job);
     }
 
@@ -106,7 +113,10 @@ class JobController extends Controller
      * @route PUT /jobs/{$id}
      */
     public function update(Request $request,  Job $job): RedirectResponse
-    {
+    {   
+        // Check if the user is authorized
+        $this->authorize('update', $job);
+
         // Validate the incoming request data
         $validatedData = $request->validate([
             'title' => 'required|string|max:255',
@@ -155,7 +165,10 @@ class JobController extends Controller
      * @route DELETE /jobs/{$id}
      */
     public function destroy(Job $job): RedirectResponse
-    {
+    {   
+        // Check if the user is authorized
+        $this->authorize('delete', $job);
+
         //if logo, then delete it 
         if($job->company_logo) {
             Storage::delete('public/logo'. $job->company_logo);
@@ -163,6 +176,50 @@ class JobController extends Controller
 
         $job->delete();
 
+        // Check if the request came from the dashboard page
+        if (request()->query('from') === 'dashboard') {
+            return redirect()->route('dashboard')->with('success', 'Job listing deleted successfully!');
+        }
+
         return redirect()->route('jobs.index')->with('success', 'Job listing deleted successfully');
+    }
+
+    //@desc Search job listings
+    //@route /GET /jobs/search
+    public function search(Request $request): View
+    {
+        $keywords = strtolower(preg_replace('/\s+/', ' ', trim($request->input('keywords', ''))));
+        $location = strtolower(preg_replace('/\s+/', ' ', trim($request->input('location', ''))));
+
+        $query = Job::query();
+
+        if ($keywords) {
+            $query->where(function ($q) use ($keywords) {
+                $q->whereRaw('LOWER(title) like ?', ['%' . $keywords . '%'])
+                    ->orWhereRaw('LOWER(description) like ?', ['%' . $keywords . '%'])
+                    ->orWhereRaw('LOWER(tags) like ?', ['%' . $keywords . '%']);
+                    
+                    if ($keywords === 'remote') {
+                        $q->orWhere('remote', true);
+                    }
+                    
+                    if ($keywords === 'on site') {
+                        $q->orWhere('remote', false);
+                    }
+                });
+        }
+    
+        if ($location) {
+            $query->where(function ($q) use ($location) {
+                $q->whereRaw('LOWER(address) like ?', ['%' . $location . '%'])
+                    ->orWhereRaw('LOWER(city) like ?', ['%' . $location . '%'])
+                    ->orWhereRaw('LOWER(state) like ?', ['%' . $location . '%'])
+                    ->orWhereRaw('LOWER(zipcode) like ?', ['%' . $location . '%']);
+            });
+        }
+
+        $jobs = $query->paginate(12);
+
+        return view('jobs.index')->with('jobs', $jobs);
     }
 }

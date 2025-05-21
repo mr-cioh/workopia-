@@ -1,3 +1,7 @@
+[x-cloak] {
+    display: none !important;
+}
+
 .overlay {
     position: absolute;
     top: 0;
@@ -10,4 +14,14 @@
 
 .hero {
     background-image: url("../images/hero.jpg");
+}
+
+#applicant-form {
+    position: relative;
+    z-index: 2;
+}
+
+#map {
+    z-index: 1;
+    height: 400px;
 }
